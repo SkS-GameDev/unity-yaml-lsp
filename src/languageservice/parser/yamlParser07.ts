@@ -17,6 +17,7 @@ export type YamlVersion = '1.1' | '1.2';
 export interface ParserOptions {
   customTags: string[];
   yamlVersion: YamlVersion;
+  schema?: 'core';
 }
 export const defaultOptions: ParserOptions = {
   customTags: [],
@@ -33,6 +34,7 @@ export function parse(text: string, parserOptions: ParserOptions = defaultOption
     customTags: getCustomTags(parserOptions.customTags),
     version: parserOptions.yamlVersion ?? defaultOptions.yamlVersion,
     keepSourceTokens: true,
+    ...(parserOptions.schema ? { schema: parserOptions.schema } : {}),
   };
   const composer = new Composer(options);
   const lineCounter = new LineCounter();

@@ -9,6 +9,7 @@ import { isKubernetesAssociatedDocument } from '../../languageservice/parser/isK
 import { removeDuplicatesObj } from '../../languageservice/utils/arrUtils.js';
 import type { LanguageService } from '../../languageservice/yamlLanguageService.js';
 import type { SettingsState } from '../../yamlSettings.js';
+import { isUnityUri } from '../../languageservice/unity/unityUtils.js';
 
 export class ValidationHandler {
   private languageService: LanguageService;
@@ -64,8 +65,9 @@ export class ValidationHandler {
     );
     const diagnostics: Diagnostic[] = [];
     for (const diagnosticItem of diagnosticResults) {
-      // Convert all warnings to errors
-      if (diagnosticItem.severity === 2) {
+      // Convert all warnings to errors, except for Unity assets where schema
+      // findings are advisory and reference issues must not look like syntax errors.
+      if (diagnosticItem.severity === 2 && !isUnityUri(textDocument.uri)) {
         diagnosticItem.severity = 1;
       }
       diagnostics.push(diagnosticItem);

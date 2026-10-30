@@ -38,6 +38,7 @@ import { SchemaPriority } from '../yamlLanguageService.js';
 import { autoDetectKubernetesSchema } from './k8sSchemaUtil.js';
 import { CRD_CATALOG_URL, EMPTY_SCHEMA_URL, isKubernetes } from '../utils/schemaUrls.js';
 import * as Strings from '../utils/strings.js';
+import { getUnitySchemaForDocument } from '../unity/unityProject.js';
 
 const ajv4 = new Ajv4.default({ allErrors: true });
 const ajv7 = new Ajv.default({ allErrors: true });
@@ -1460,6 +1461,11 @@ export class YAMLSchemaService implements IJSONSchemaService {
   }
 
   public async getSchemaForResource(resource: string, doc: JSONDocument): Promise<ResolvedSchema> {
+    const unitySchema = getUnitySchemaForDocument(resource, doc as SingleYAMLDocument);
+    if (unitySchema !== undefined) {
+      return unitySchema === null ? null : new ResolvedSchema(unitySchema, [], []);
+    }
+
     const resolveSchemaForResource = async (schemas: string[]): Promise<ResolvedSchema> => {
       const schemaHandle = this.createCombinedSchema(resource, schemas);
       const schema = await Promise.resolve(schemaHandle.getResolvedSchema());

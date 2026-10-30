@@ -18,11 +18,14 @@ import { yamlDocumentsCache } from '../parser/yaml-documents.js';
 import type { Telemetry } from '../telemetry.js';
 import type { AdditionalValidator } from './validation/types.js';
 import { UnusedAnchorsValidator } from './validation/unused-anchors.js';
+import { UnityReferenceValidator } from './validation/unity-references.js';
 import { YAMLStyleValidator } from './validation/yaml-style.js';
 import { MapKeyOrderValidator } from './validation/map-key-order.js';
 import { getSchemaFromModeline } from './modelineUtil.js';
 import { isKubernetes as isKubernetesSchemaURI } from '../utils/schemaUrls.js';
 import type { ErrorCode } from '../jsonLanguageTypes.js';
+import { filterUnityParserDiagnostics } from '../unity/unityDiagnostics.js';
+import { isTextUnityYaml, isUnityDocument, isUnityUri } from '../unity/unityUtils.js';
 
 /**
  * Convert a YAMLDocDiagnostic to a language server Diagnostic
@@ -71,13 +74,18 @@ export class YAMLValidation {
       }
     }
     this.validators.push(new UnusedAnchorsValidator());
+    this.validators.push(new UnityReferenceValidator());
   }
 
   public async doValidation(textDocument: TextDocument, isKubernetes = false): Promise<Diagnostic[]> {
     if (!this.validationEnabled) {
       return [];
     }
+    if (isUnityUri(textDocument.uri) && !isTextUnityYaml(textDocument.getText())) {
+      return [];
+    }
 
+    const unityDocument = isUnityDocument(textDocument);
     const validationResult: (Diagnostic | YAMLDocDiagnostic)[] = [];
     let suppressKubernetesMatchesMultiple = isKubernetes;
     try {
@@ -95,9 +103,9 @@ export class YAMLValidation {
         currentYAMLDoc.disableAdditionalProperties = this.disableAdditionalProperties;
         currentYAMLDoc.uri = textDocument.uri;
 
+        const parserDiagnostics = [...currentYAMLDoc.errors, ...currentYAMLDoc.warnings];
         validationResult.push(
-          ...currentYAMLDoc.errors,
-          ...currentYAMLDoc.warnings,
+          ...(unityDocument ? filterUnityParserDiagnostics(parserDiagnostics) : parserDiagnostics),
           ...(await this.getSchemaDiagnostics(textDocument, currentYAMLDoc)),
           ...this.runAdditionalValidators(textDocument, currentYAMLDoc)
         );

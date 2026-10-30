@@ -41,6 +41,9 @@ import type { ValidationHandler } from './validationHandlers.js';
 import { ResultLimitReachedNotification } from '../../requestTypes.js';
 import * as path from 'path';
 import type { TextDocument } from 'vscode-languageserver-textdocument';
+import { isTextUnityYaml, isUnityUri } from '../../languageservice/unity/unityUtils.js';
+import { getUnityDefinition, getUnityDocumentSymbols, getUnityHover } from '../../languageservice/unity/unityNavigation.js';
+import { getUnityCompletion } from '../../languageservice/unity/unityCompletion.js';
 
 export class LanguageHandlers {
   private languageService: LanguageService;
@@ -102,6 +105,11 @@ export class LanguageHandlers {
       return;
     }
 
+    const unitySymbols = isUnityUri(document.uri) ? getUnityDocumentSymbols(document) : undefined;
+    if (unitySymbols) {
+      return unitySymbols;
+    }
+
     const onResultLimitExceeded = this.onResultLimitExceeded(
       document.uri,
       this.yamlSettings.maxItemsComputed,
@@ -127,6 +135,9 @@ export class LanguageHandlers {
     if (!document) {
       return [];
     }
+    if (isUnityUri(document.uri)) {
+      return [];
+    }
 
     const formatterSettings = await this.resolveFormatterSettings(document);
     if (formatterSettings.enable === false) {
@@ -147,6 +158,9 @@ export class LanguageHandlers {
     if (!document) {
       return;
     }
+    if (isUnityUri(document.uri)) {
+      return;
+    }
     return this.languageService.doDocumentOnTypeFormatting(document, params);
   }
 
@@ -159,6 +173,12 @@ export class LanguageHandlers {
 
     if (!document) {
       return Promise.resolve(undefined);
+    }
+    if (isUnityUri(document.uri)) {
+      const unityHover = getUnityHover(document, textDocumentPositionParams.position);
+      if (unityHover) {
+        return Promise.resolve(unityHover);
+      }
     }
 
     return this.languageService.doHover(document, textDocumentPositionParams.position);
@@ -178,6 +198,15 @@ export class LanguageHandlers {
 
     if (!textDocument) {
       return Promise.resolve(result);
+    }
+    if (isUnityUri(textDocument.uri) && !isTextUnityYaml(textDocument.getText())) {
+      return Promise.resolve(result);
+    }
+    if (isUnityUri(textDocument.uri)) {
+      const unityCompletion = getUnityCompletion(textDocument, textDocumentPosition.position);
+      if (unityCompletion) {
+        return Promise.resolve(unityCompletion);
+      }
     }
     return this.languageService.doComplete(
       textDocument,
@@ -258,6 +287,12 @@ export class LanguageHandlers {
     const textDocument = this.yamlSettings.documents.get(params.textDocument.uri);
     if (!textDocument) {
       return;
+    }
+    if (isUnityUri(textDocument.uri)) {
+      const unityDefinition = getUnityDefinition(textDocument, params.position);
+      if (unityDefinition) {
+        return unityDefinition;
+      }
     }
 
     return this.languageService.doDefinition(textDocument, params);

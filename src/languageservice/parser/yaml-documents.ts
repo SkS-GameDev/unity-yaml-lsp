@@ -17,6 +17,7 @@ import { isArrayEqual } from '../utils/arrUtils.js';
 import { getParent } from '../utils/yamlAstUtils.js';
 import type { TextBuffer } from '../utils/textBuffer.js';
 import { getIndentation } from '../utils/strings.js';
+import { attachUnityMetadata, isTextUnityYaml, isUnityUri, preprocessUnityText } from '../unity/unityUtils.js';
 
 /**
  * These documents are collected into a final YAMLDocument
@@ -27,6 +28,11 @@ export class SingleYAMLDocument extends JSONDocument {
   private _internalDocument: Document;
   public root: ASTNode;
   public currentDocIndex: number;
+  public unityClassId?: string;
+  public unityFileID?: string;
+  public unityStripped?: boolean;
+  public unityHeaderOffset?: number;
+  public unityHeaderEnd?: number;
   private _lineComments: string[];
   private _documentHeaderComments: string[] = [];
 
@@ -44,6 +50,11 @@ export class SingleYAMLDocument extends JSONDocument {
     copy.disableAdditionalProperties = this.disableAdditionalProperties;
     copy.uri = this.uri;
     copy.currentDocIndex = this.currentDocIndex;
+    copy.unityClassId = this.unityClassId;
+    copy.unityFileID = this.unityFileID;
+    copy.unityStripped = this.unityStripped;
+    copy.unityHeaderOffset = this.unityHeaderOffset;
+    copy.unityHeaderEnd = this.unityHeaderEnd;
     copy._lineComments = this.lineComments.slice();
     copy._documentHeaderComments = this.documentHeaderComments.slice();
     // this will re-create root node
@@ -303,12 +314,17 @@ export class YamlDocuments {
       cacheEntry.version !== document.version ||
       (parserOptions.customTags && !isArrayEqual(cacheEntry.parserOptions.customTags, parserOptions.customTags))
     ) {
-      let text = document.getText();
-      // if text is contains only whitespace wrap all text in object to force schema selection
-      if (addRootObject && !/\S/.test(text)) {
+      const originalText = document.getText();
+      const unity = isUnityUri(document.uri);
+      let text = unity ? (isTextUnityYaml(originalText) ? preprocessUnityText(originalText) : '') : originalText;
+      if (!unity && addRootObject && !/\S/.test(text)) {
         text = `{${text}}`;
       }
-      const doc = this.parse(text, parserOptions, document);
+      const parseOptions = unity ? { ...parserOptions, schema: 'core' as const } : parserOptions;
+      const doc = this.parse(text, parseOptions, document);
+      if (unity) {
+        attachUnityMetadata(doc, originalText);
+      }
       cacheEntry.document = doc;
       cacheEntry.version = document.version;
       cacheEntry.parserOptions = parserOptions;

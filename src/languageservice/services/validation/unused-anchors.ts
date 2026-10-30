@@ -12,9 +12,11 @@ import type { SingleYAMLDocument } from '../../parser/yaml-documents.js';
 import type { AdditionalValidator } from './types.js';
 import { isCollectionItem } from '../../utils/yamlAstUtils.js';
 import * as l10n from '@vscode/l10n';
+import { isUnityUri } from '../../unity/unityUtils.js';
 
 export class UnusedAnchorsValidator implements AdditionalValidator {
   validate(document: TextDocument, yamlDoc: SingleYAMLDocument): Diagnostic[] {
+    if (isUnityUri(yamlDoc.uri)) return [];
     const result = [];
     const anchors = new Set<Scalar | YAMLMap | YAMLSeq>();
     const usedAnchors = new Set<Node>();
