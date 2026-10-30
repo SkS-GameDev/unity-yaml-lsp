@@ -1,6 +1,6 @@
 {
-  "name": "yaml-language-server",
-  "description": "YAML language server",
+  "name": "unity-yaml-lsp",
+  "description": "Unity YAML language server",
   "version": "2.1.0",
   "author": "Red Hat",
   "license": "MIT",
@@ -15,13 +15,22 @@
   ],
   "type": "module",
   "bin": {
-    "yaml-language-server": "bin/yaml-language-server"
+    "unity-yaml-lsp": "bin/unity-yaml-lsp"
   },
   "main": "./out/src/index.js",
   "l10n": "./l10n",
+  "files": [
+    "bin",
+    "out",
+    "l10n",
+    "LICENSE",
+    "README.md",
+    "UNITY.md"
+  ],
   "keywords": [
     "yaml",
-    "LSP"
+    "LSP",
+    "unity"
   ],
   "repository": {
     "type": "git",

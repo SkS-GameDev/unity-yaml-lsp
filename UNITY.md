@@ -28,21 +28,27 @@ for LSP clients such as OpenCode.
 Diagnostics use errors for YAML syntax and duplicate fileIDs, and warnings for
 schema findings, missing references, and missing assets.
 
-## Build
+## Build and install
 
 ```sh
 npm install
 npm run compile
+npm link            # creates the global `unity-yaml-lsp` command
 ```
 
-The server entry point is `out/src/server.js`.
+`npm link` (or `npm install -g .`) installs the server as a global binary, so the
+OpenCode configuration contains no filesystem paths. The package and binary are
+named `unity-yaml-lsp`; the stock `yaml-language-server` stays untouched.
+
+On another machine, clone the fork and repeat those three commands, or publish the
+package and run `npm install -g unity-yaml-lsp`.
 
 ## OpenCode configuration
 
 ```jsonc
 "lsp": {
   "unity-yaml": {
-    "command": ["node", "/absolute/path/to/unity-yaml-lsp/out/src/server.js", "--stdio"],
+    "command": ["unity-yaml-lsp", "--stdio"],
     "extensions": [
       ".unity", ".prefab", ".asset", ".mat", ".anim", ".controller",
       ".overrideController", ".physicMaterial", ".physicsMaterial2D",
