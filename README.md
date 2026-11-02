@@ -2,6 +2,8 @@
 
 # YAML Language Server
 
+[Русская версия](README.ru.md)
+
 Provides YAML language features over the [Language Server Protocol](https://github.com/Microsoft/language-server-protocol) (LSP), including validation, completion, hover, formatting, document symbols, and schema-based intelligence.
 
 Starting from version `1.0.0`, the language server uses [eemeli/yaml](https://github.com/eemeli/yaml) as its YAML parser, which strictly enforces the specified YAML spec version. The default YAML spec version is `1.2`. Set `yaml.yamlVersion` to `1.1` for compatibility with older YAML files.

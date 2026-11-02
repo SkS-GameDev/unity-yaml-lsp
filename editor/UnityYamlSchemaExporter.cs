@@ -9,6 +9,8 @@ using System.Reflection;
 using System.Text;
 using System.Text.RegularExpressions;
 using UnityEditor;
+using UnityEditor.Animations;
+using UnityEditor.Presets;
 using UnityEditor.SceneManagement;
 using UnityEngine;
 using UnityEngine.SceneManagement;
@@ -30,7 +32,7 @@ namespace UnityYamlLsp
         [MenuItem("Tools/Unity YAML LSP/Export Schema")]
         public static void ExportMenu()
         {
-            Debug.Log(Export());
+            Export();
         }
 
         public static string Export()
@@ -47,7 +49,9 @@ namespace UnityYamlLsp
                 {
                     AssetDatabase.DeleteAsset(TempScenePath);
                 }
-                scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
+                scene = Application.isBatchMode
+                    ? EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single)
+                    : EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Additive);
 
                 var instances = new List<Component>();
                 var root = new GameObject("__UnityYamlSchemaRoot");
@@ -131,6 +135,9 @@ namespace UnityYamlLsp
                     };
                 }
 
+                ExportAssetClasses(classes, notes);
+                ExportProjectSettingsClasses(classes, notes, projectRoot);
+
                 var scriptMap = BuildScriptGuidMap();
                 var scriptTypes = TypeCache.GetTypesDerivedFrom<MonoBehaviour>()
                     .Concat(TypeCache.GetTypesDerivedFrom<ScriptableObject>())
@@ -142,13 +149,19 @@ namespace UnityYamlLsp
 
                 foreach (var type in scriptTypes)
                 {
-                    string guid;
-                    if (!scriptMap.TryGetValue(type, out guid)) continue;
+                    ScriptEntry script;
+                    if (!scriptMap.TryGetValue(type, out script)) continue;
+                    var guid = script.Guid;
                     try
                     {
                         var properties = MonoBehaviourBaseProperties();
                         CollectScriptFields(type, properties, new HashSet<string>(properties.Keys), new HashSet<Type>());
                         var inner = ObjectSchema(properties, true);
+                        if (script.Path.StartsWith("Packages/", StringComparison.Ordinal) ||
+                            script.Path.StartsWith("Library/PackageCache/", StringComparison.Ordinal))
+                        {
+                            MakePermissive(inner);
+                        }
                         var wrapper = ObjectSchema(
                             new Dictionary<string, object> { { "MonoBehaviour", inner } },
                             true,
@@ -177,8 +190,10 @@ namespace UnityYamlLsp
                 var outputPath = Path.Combine(projectRoot, OutputRelativePath);
                 Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
                 File.WriteAllText(outputPath, json);
-                return "Exported " + classes.Count + " classes, " + scripts.Count + " scripts to " + outputPath +
-                       " (" + json.Length + " bytes). Notes: " + string.Join("; ", notes.Take(20));
+                var message = "Exported " + classes.Count + " classes, " + scripts.Count + " scripts to " + outputPath +
+                              " (" + json.Length + " bytes). Notes: " + string.Join("; ", notes.Take(40));
+                Debug.Log(message);
+                return message;
             }
             finally
             {
@@ -187,6 +202,141 @@ namespace UnityYamlLsp
                 if (previousActive.IsValid()) SceneManager.SetActiveScene(previousActive);
                 AssetDatabase.Refresh();
             }
+        }
+
+        private const string TempAssetFolder = "Assets/__UnityYamlSchemaTemp";
+
+        private static void ExportAssetClasses(Dictionary<string, object> classes, List<string> notes)
+        {
+            if (!AssetDatabase.IsValidFolder(TempAssetFolder)) AssetDatabase.CreateFolder("Assets", "__UnityYamlSchemaTemp");
+            var clip = new AnimationClip();
+            var presetTarget = clip;
+            try
+            {
+                AddAssetSchema(classes, notes, TempAssetFolder + "/Material.mat", () => new Material(FindShader()));
+                AddAssetSchema(classes, notes, TempAssetFolder + "/AnimationClip.anim", () => clip);
+                AddAssetSchema(classes, notes, TempAssetFolder + "/AnimatorController.controller",
+                    () => AnimatorController.CreateAnimatorControllerAtPath(TempAssetFolder + "/AnimatorController.controller"));
+                AddAssetSchema(classes, notes, TempAssetFolder + "/AnimatorOverrideController.overrideController", () => new AnimatorOverrideController());
+                AddAssetSchema(classes, notes, TempAssetFolder + "/AvatarMask.mask", () => new AvatarMask());
+                AddAssetSchema(classes, notes, TempAssetFolder + "/Preset.preset", () => new Preset(presetTarget));
+                AddAssetSchema(classes, notes, TempAssetFolder + "/LightingSettings.lighting", () => new LightingSettings());
+            }
+            finally
+            {
+                AssetDatabase.DeleteAsset(TempAssetFolder);
+                UnityEngine.Object.DestroyImmediate(clip);
+            }
+        }
+
+        private static Shader FindShader()
+        {
+            return Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard") ?? Shader.Find("Sprites/Default");
+        }
+
+        private static void AddAssetSchema(Dictionary<string, object> classes, List<string> notes, string assetPath, Func<UnityEngine.Object> create)
+        {
+            try
+            {
+                var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath) ?? create();
+                if (asset == null)
+                {
+                    notes.Add(Path.GetFileName(assetPath) + ": not created");
+                    return;
+                }
+                if (!AssetDatabase.Contains(asset)) AssetDatabase.CreateAsset(asset, assetPath);
+                AssetDatabase.SaveAssets();
+                var projectRoot = Path.GetDirectoryName(Application.dataPath);
+                var absolute = Path.Combine(projectRoot, assetPath);
+                if (!File.Exists(absolute))
+                {
+                    notes.Add(Path.GetFileName(assetPath) + ": not saved");
+                    return;
+                }
+                AddObjectSchema(classes, notes, asset, File.ReadAllText(absolute), Path.GetFileName(assetPath));
+            }
+            catch (Exception e)
+            {
+                notes.Add(Path.GetFileName(assetPath) + ": " + e.GetType().Name + " " + e.Message);
+            }
+        }
+
+        private static void ExportProjectSettingsClasses(Dictionary<string, object> classes, List<string> notes, string projectRoot)
+        {
+            var directory = Path.Combine(projectRoot, "ProjectSettings");
+            if (!Directory.Exists(directory)) return;
+            foreach (var path in Directory.GetFiles(directory, "*.asset").OrderBy(f => f, StringComparer.Ordinal))
+            {
+                var name = Path.GetFileName(path);
+                try
+                {
+                    var target = AssetDatabase.LoadAllAssetsAtPath("ProjectSettings/" + name).FirstOrDefault(o => o != null);
+                    if (target == null)
+                    {
+                        notes.Add(name + ": not loaded");
+                        continue;
+                    }
+                    AddObjectSchema(classes, notes, target, File.ReadAllText(path), name);
+                }
+                catch (Exception e)
+                {
+                    notes.Add(name + ": " + e.GetType().Name);
+                }
+            }
+        }
+
+        private static void AddObjectSchema(Dictionary<string, object> classes, List<string> notes, UnityEngine.Object target, string yaml, string label)
+        {
+            var regex = new Regex(@"(?m)^--- !u!(\d+) &-?\d+\r?\n(\w+):");
+            var typeName = target.GetType().Name;
+            Match chosen = null;
+            Match fallback = null;
+            foreach (Match match in regex.Matches(yaml))
+            {
+                var rootKey = match.Groups[2].Value;
+                if (rootKey == typeName)
+                {
+                    chosen = match;
+                    break;
+                }
+                if (fallback == null && rootKey != "MonoBehaviour") fallback = match;
+            }
+            chosen = chosen ?? fallback;
+            if (chosen == null)
+            {
+                notes.Add(label + ": no class id");
+                return;
+            }
+            var classId = chosen.Groups[1].Value;
+            var root = chosen.Groups[2].Value;
+            try
+            {
+                var properties = ReadSerializedProperties(target);
+                PatchKnownUnityMaps(root, properties);
+                var inner = ObjectSchema(properties, true);
+                MakePermissive(inner);
+                var wrapper = new Dictionary<string, object> { { root, inner } };
+                classes[classId] = new Dictionary<string, object>
+                {
+                    { "name", root },
+                    { "schema", ObjectSchema(wrapper, true, new List<object> { root }) },
+                };
+            }
+            catch (Exception e)
+            {
+                notes.Add(label + " schema: " + e.Message);
+            }
+        }
+
+        private static void PatchKnownUnityMaps(string root, Dictionary<string, object> properties)
+        {
+            if (root != "Material") return;
+            if (!properties.ContainsKey("stringTagMap")) return;
+            properties["stringTagMap"] = new Dictionary<string, object>
+            {
+                { "type", new List<object> { "object", "null" } },
+                { "additionalProperties", StringSchema() },
+            };
         }
 
         private static Dictionary<string, string> ReadClassIds(string yaml)
@@ -362,16 +512,25 @@ namespace UnityYamlLsp
             return schema;
         }
 
-        private static Dictionary<Type, string> BuildScriptGuidMap()
+        private sealed class ScriptEntry
         {
-            var result = new Dictionary<Type, string>();
+            public string Guid;
+            public string Path;
+        }
+
+        private static Dictionary<Type, ScriptEntry> BuildScriptGuidMap()
+        {
+            var result = new Dictionary<Type, ScriptEntry>();
             foreach (var guid in AssetDatabase.FindAssets("t:MonoScript"))
             {
                 var assetPath = AssetDatabase.GUIDToAssetPath(guid);
                 var script = AssetDatabase.LoadAssetAtPath<MonoScript>(assetPath);
                 if (script == null) continue;
                 var type = script.GetClass();
-                if (type != null && !result.ContainsKey(type)) result[type] = guid;
+                if (type != null && !result.ContainsKey(type))
+                {
+                    result[type] = new ScriptEntry { Guid = guid, Path = assetPath };
+                }
             }
             return result;
         }

@@ -24,7 +24,7 @@ import { MapKeyOrderValidator } from './validation/map-key-order.js';
 import { getSchemaFromModeline } from './modelineUtil.js';
 import { isKubernetes as isKubernetesSchemaURI } from '../utils/schemaUrls.js';
 import type { ErrorCode } from '../jsonLanguageTypes.js';
-import { filterUnityParserDiagnostics } from '../unity/unityDiagnostics.js';
+import { filterUnityParserDiagnostics, filterUnitySchemaDiagnostics } from '../unity/unityDiagnostics.js';
 import { isTextUnityYaml, isUnityDocument, isUnityUri } from '../unity/unityUtils.js';
 
 /**
@@ -104,9 +104,10 @@ export class YAMLValidation {
         currentYAMLDoc.uri = textDocument.uri;
 
         const parserDiagnostics = [...currentYAMLDoc.errors, ...currentYAMLDoc.warnings];
+        const schemaDiagnostics = await this.getSchemaDiagnostics(textDocument, currentYAMLDoc);
         validationResult.push(
           ...(unityDocument ? filterUnityParserDiagnostics(parserDiagnostics) : parserDiagnostics),
-          ...(await this.getSchemaDiagnostics(textDocument, currentYAMLDoc)),
+          ...(unityDocument ? filterUnitySchemaDiagnostics(schemaDiagnostics) : schemaDiagnostics),
           ...this.runAdditionalValidators(textDocument, currentYAMLDoc)
         );
       }

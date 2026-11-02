@@ -77,7 +77,15 @@ The exporter:
 - reflects user `MonoBehaviour`/`ScriptableObject` fields, including
   `[SerializeField]`, `[FormerlySerializedAs]`, `[Tooltip]`, `[Range]`, enums,
   arrays/lists, and `[Serializable]` nested types;
-- maps each script to its `MonoScript` GUID.
+- maps each script to its `MonoScript` GUID;
+- exports asset classes (Material, AnimationClip, AnimatorController,
+  AnimatorOverrideController, AvatarMask, Preset, TerrainData, LightingSettings) by
+  creating temporary assets and reading their serialized fields;
+- exports `ProjectSettings/*.asset` classes (GraphicsSettings, QualitySettings,
+  TagManager, InputManager, EditorBuildSettings, PhysicsManager, TimeManager,
+  AudioManager, and the rest) by loading the project settings objects;
+- runs in batch mode: `Unity -batchmode -quit -projectPath <project> -executeMethod
+  UnityYamlLsp.UnityYamlSchemaExporter.Export -logFile <log>`.
 
 Without the schema the server still checks syntax and references, and skips field
 validation.
@@ -88,6 +96,7 @@ validation.
 npm run compile
 node --test out/test/unity.test.js   # Unity-specific tests
 npm test                             # full upstream + Unity suite
+node scripts/schema-check.mjs <project>/Library/UnityYaml/schema.json
 ```
 
 ## Known limits
@@ -99,6 +108,11 @@ npm test                             # full upstream + Unity suite
   string fields accept numbers/booleans and array fields accept Unity's hex string
   form.
 - Prefab override paths (`m_Modifications.propertyPath`) are not validated.
+- Legacy serialized fields that reflection cannot see (`m_TypeName`, `m_HashCode`) are
+  filtered out of strict script-schema diagnostics.
+- `TerrainData` is not exported: Unity writes it without a YAML document header.
+- Asset/project settings schemas are permissive about unknown fields (Unity adds and
+  removes serialized fields between versions).
 - Very large scenes (tens of MB) take seconds to validate on open; the server does
   not yet validate only the changed object.
 - Rename and workspace-wide reference search for `fileID`/`guid` are not implemented.
