@@ -25,7 +25,8 @@
     "l10n",
     "LICENSE",
     "README.md",
-    "UNITY.md"
+    "UNITY.md",
+    "README.ru.md"
   ],
   "keywords": [
     "yaml",
@@ -80,7 +81,8 @@
     "build": "npm run clean && npm run lint && npm run compile",
     "check-dependencies": "node ./scripts/check-dependencies.js",
     "pull-remote": "git pull https://github.com/redhat-developer/yaml-language-server.git main",
-    "schema-check": "node scripts/schema-check.mjs"
+    "schema-check": "node scripts/schema-check.mjs",
+    "prepublishOnly": "npm run compile"
   },
   "c8": {
     "include": [
