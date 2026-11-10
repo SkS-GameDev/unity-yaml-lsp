@@ -1,4 +1,4 @@
-![CI](https://github.com/redhat-developer/yaml-language-server/workflows/CI/badge.svg) [![version](https://img.shields.io/npm/v/yaml-language-server.svg)](https://www.npmjs.com/package/yaml-language-server) [![Coverage Status](https://coveralls.io/repos/github/redhat-developer/yaml-language-server/badge.svg?branch=main)](https://coveralls.io/github/redhat-developer/yaml-language-server?branch=main)
+![CI](https://github.com/redhat-developer/yaml-language-server/workflows/CI/badge.svg) [![version](https://img.shields.io/npm/v/unity-yaml-lsp.svg)](https://www.npmjs.com/package/unity-yaml-lsp) [![Coverage Status](https://coveralls.io/repos/github/redhat-developer/yaml-language-server/badge.svg?branch=main)](https://coveralls.io/github/redhat-developer/yaml-language-server?branch=main)
 
 # YAML Language Server
 
@@ -9,6 +9,15 @@ Provides YAML language features over the [Language Server Protocol](https://gith
 Starting from version `1.0.0`, the language server uses [eemeli/yaml](https://github.com/eemeli/yaml) as its YAML parser, which strictly enforces the specified YAML spec version. The default YAML spec version is `1.2`. Set `yaml.yamlVersion` to `1.1` for compatibility with older YAML files.
 
 Schema validation supports JSON Schema `draft-04`, `draft-07`, `2019-09`, and `2020-12`.
+
+## Installation
+
+```sh
+npm install -g unity-yaml-lsp
+```
+
+This installs the `unity-yaml-lsp` command; the stock `yaml-language-server` package is not affected.
+Unity-specific behaviour is described in [UNITY.md](UNITY.md).
 
 ## Features
 
@@ -367,18 +376,18 @@ To build a custom integration, run the server using one of the following options
 
 #### Using the npm package
 
-Install yaml-language-server globally:
+Install the server globally:
 
 ```sh
-npm install -g yaml-language-server
+npm install -g unity-yaml-lsp
 ```
 
 Start the server with the communication channel required by your client:
 
 ```sh
-yaml-language-server --stdio
-yaml-language-server --socket=<port>
-yaml-language-server --node-ipc
+unity-yaml-lsp --stdio
+unity-yaml-lsp --socket=<port>
+unity-yaml-lsp --node-ipc
 ```
 
 #### Using a local build

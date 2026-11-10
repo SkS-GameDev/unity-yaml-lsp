@@ -1,7 +1,7 @@
 {
   "name": "unity-yaml-lsp",
   "description": "Unity YAML language server",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "author": "Red Hat",
   "license": "MIT",
   "contributors": [
@@ -35,7 +35,7 @@
   ],
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/redhat-developer/yaml-language-server.git"
+    "url": "git+https://github.com/SkS-GameDev/unity-yaml-lsp.git"
   },
   "engines": {
     "node": ">=22.13.0"

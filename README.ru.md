@@ -24,13 +24,19 @@ upstream-возможностей — в [README.md](README.md), детали Un
 ## Установка
 
 ```sh
-npm install
-npm run compile
-npm link
+npm install -g unity-yaml-lsp
 ```
 
 Появится глобальная команда `unity-yaml-lsp`; штатный `yaml-language-server` не
 затрагивается.
+
+Из исходников:
+
+```sh
+npm install
+npm run compile
+npm link
+```
 
 ## OpenCode
 
